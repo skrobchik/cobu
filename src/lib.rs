@@ -1,4 +1,6 @@
-use std::{io::Write, ops::Range, path::PathBuf, time::Instant};
+use std::{
+    collections::BTreeMap, error::Error, io::Write, ops::Range, path::PathBuf, time::Instant,
+};
 
 use anyhow::Context;
 
@@ -19,12 +21,29 @@ struct Args {
     #[arg(short, long)]
     package: Option<String>,
 
-    #[arg(long)]
+    #[arg(long, value_hint = clap::ValueHint::FilePath)]
     manifest_path: Option<PathBuf>,
+
+    #[arg(long, value_parser = parse_key_val::<String, PathBuf>, value_delimiter = ',')]
+    libs: Vec<(String, PathBuf)>,
 
     /// Output path
     #[arg(short, long)]
     output: Option<PathBuf>,
+}
+
+/// Copied from https://github.com/clap-rs/clap/blob/2920fb082c987acb72ed1d1f47991c4d157e380d/examples/typed-derive.rs#L48
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
+where
+    T: std::str::FromStr,
+    T::Err: Error + Send + Sync + 'static,
+    U: std::str::FromStr,
+    U::Err: Error + Send + Sync + 'static,
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{s}`"))?;
+    Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
 fn rustc_diagnostics(src: &str) -> anyhow::Result<Vec<Diagnostic>> {
@@ -71,7 +90,7 @@ fn rustc_diagnostics(src: &str) -> anyhow::Result<Vec<Diagnostic>> {
     Ok(diagnostics)
 }
 
-fn remove_dead_code(src: String) -> anyhow::Result<String> {
+pub fn remove_dead_code(src: String) -> anyhow::Result<String> {
     let dead_code_diagnostics: Vec<Diagnostic> = rustc_diagnostics(&src)?
         .into_iter()
         .filter(|d| d.code.as_ref().map_or(false, |c| c.code == "dead_code"))
@@ -137,12 +156,12 @@ fn remove_dead_code(src: String) -> anyhow::Result<String> {
         .filter(|(i, _b)| !dead_bytes[*i])
         .map(|(_i, b)| b)
         .collect();
-    let src: String = String::from_utf8(src).unwrap();
+    let src: String = String::from_utf8(src)?;
 
     Ok(src)
 }
 
-fn rustfmt(src: &str) -> anyhow::Result<String> {
+pub fn rustfmt(src: &str) -> anyhow::Result<String> {
     let mut command = std::process::Command::new("rustfmt")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -162,32 +181,17 @@ fn rustfmt(src: &str) -> anyhow::Result<String> {
     Ok(stdout_string)
 }
 
-pub fn cli(concat_args: Option<&[String]>) -> anyhow::Result<()> {
-    // - Get source code
-    // - Expand dependencies
-    // - Run through rustc and get json diagnostics
-    // - Parse AST and eliminate dead code
-    // - Run through rustfmt
-    // - Write to output path
-    let start_instant_cli = std::time::Instant::now();
-
-    let mut args: Vec<String> = std::env::args().collect();
-    if let Some(concat_args) = concat_args {
-        args.extend_from_slice(concat_args);
-    };
-    let args = Args::parse_from(args);
-
-    let manifest_path = args
-        .manifest_path
-        .unwrap_or(std::env::current_dir()?.join("Cargo.toml"));
+fn bin_src(args: &Args) -> anyhow::Result<String> {
+    let cwd_manifest_path = std::env::current_dir()?.join("Cargo.toml");
+    let manifest_path = args.manifest_path.as_ref().unwrap_or(&cwd_manifest_path);
     let metadata = cargo_metadata::MetadataCommand::new()
         .manifest_path(manifest_path)
         .exec()?;
-    let package = if let Some(package) = args.package {
+    let package = if let Some(package) = &args.package {
         metadata
             .packages
             .iter()
-            .find(|p| p.name == package)
+            .find(|p| p.name == *package)
             .context(format!("Package {package} not found"))?
     } else {
         &metadata.packages[0]
@@ -201,7 +205,32 @@ pub fn cli(concat_args: Option<&[String]>) -> anyhow::Result<()> {
             .src_path,
     );
     let src = std::fs::read_to_string(bin_src_path)?;
-    // TODO: Expand dependencies
+    Ok(src)
+}
+
+fn expand_libs(libs: &BTreeMap<String, PathBuf>, src: String) -> Result<String, std::io::Error> {
+    libs.iter()
+        .map(|(name, path)| {
+            std::fs::read_to_string(path).map(|contents| format!("mod {name} {{\n{}\n}}", contents))
+        })
+        .chain(std::iter::once(Ok(src)))
+        .collect()
+}
+
+pub fn cli(concat_args: Option<&[String]>) -> anyhow::Result<()> {
+    let start_instant_cli = std::time::Instant::now();
+
+    let mut args: Vec<String> = std::env::args().collect();
+    if let Some(concat_args) = concat_args {
+        args.extend_from_slice(concat_args);
+    };
+    let args = Args::parse_from(args);
+
+    let libs: BTreeMap<String, PathBuf> = args.libs.clone().into_iter().collect();
+    assert_eq!(libs.len(), args.libs.len(), "no duplicate lib names");
+
+    let src = bin_src(&args)?;
+    let src = expand_libs(&libs, src)?;
 
     let start_instant_deadcode = Instant::now();
     let src = remove_dead_code(src)?;
