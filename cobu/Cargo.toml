@@ -1,0 +1,15 @@
+[package]
+name = "cobu"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Robert Serrano Kobylyansky <robertkobylyansky@gmail.com>"]
+
+[dependencies]
+anyhow = "1.0"
+cargo_metadata = "0.18"
+clap = { version = "4.5", features = ["derive"] }
+proc-macro2 = { version = "1.0", features = ["span-locations"] }
+quote = "1.0"
+serde_json = "1.0"
+syn = { version = "2.0", features = ["full"] }
