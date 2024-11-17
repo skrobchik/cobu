@@ -1,3 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["cobu"]
+members = ["cobu", "crads"]
+
+[workspace.package]
+license = "MIT"
+edition = "2021"
+authors = ["Robert Serrano Kobylyansky <robertkobylyansky@gmail.com>"]

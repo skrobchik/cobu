@@ -1,9 +1,9 @@
 [package]
 name = "cobu"
 version = "0.1.0"
-edition = "2021"
-license = "MIT"
-authors = ["Robert Serrano Kobylyansky <robertkobylyansky@gmail.com>"]
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
 
 [dependencies]
 anyhow = "1.0"
