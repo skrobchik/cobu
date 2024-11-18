@@ -4,7 +4,6 @@ seq!(N in 1..=3 {
     mod input_~N;
     mod golden_~N;
 });
-mod output_2;
 
 use seq_macro::seq;
 use std::{io::Write, path::PathBuf};

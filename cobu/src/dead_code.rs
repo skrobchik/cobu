@@ -55,6 +55,7 @@ struct DeadIdentifierVisitor {
     dead_code_diagnostic_spans: Vec<DiagnosticSpan>,
     output_dead_struct_identifiers: Vec<Ident>,
     output_dead_fn_identifiers: Vec<Ident>,
+    output_dead_trait_identifiers: Vec<Ident>,
 }
 
 impl DeadIdentifierVisitor {
@@ -63,6 +64,7 @@ impl DeadIdentifierVisitor {
             dead_code_diagnostic_spans,
             output_dead_struct_identifiers: Vec::new(),
             output_dead_fn_identifiers: Vec::new(),
+            output_dead_trait_identifiers: Vec::new(),
         }
     }
 
@@ -109,19 +111,31 @@ impl<'ast> Visit<'ast> for DeadIdentifierVisitor {
             self.output_dead_fn_identifiers.push(i.sig.ident.clone());
         }
     }
+
+    fn visit_item_trait(&mut self, i: &'ast syn::ItemTrait) {
+        if self.is_dead_code(&i.ident) {
+            self.output_dead_trait_identifiers.push(i.ident.clone());
+        }
+    }
 }
 
 struct DeadCodeVisitor {
     dead_struct_identifiers: Vec<Ident>,
     dead_fn_identifiers: Vec<Ident>,
+    dead_trait_identifiers: Vec<Ident>,
     output_dead_spans: Vec<Span>,
 }
 
 impl DeadCodeVisitor {
-    fn new(dead_struct_identifiers: Vec<Ident>, dead_fn_identifiers: Vec<Ident>) -> Self {
+    fn new(
+        dead_struct_identifiers: Vec<Ident>,
+        dead_fn_identifiers: Vec<Ident>,
+        dead_trait_identifiers: Vec<Ident>,
+    ) -> Self {
         Self {
             dead_struct_identifiers,
             dead_fn_identifiers,
+            dead_trait_identifiers,
             output_dead_spans: Vec::new(),
         }
     }
@@ -136,6 +150,12 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
 
     fn visit_item_fn(&mut self, i: &'ast syn::ItemFn) {
         if self.dead_fn_identifiers.contains(&i.sig.ident) {
+            self.output_dead_spans.push(i.span());
+        }
+    }
+
+    fn visit_item_trait(&mut self, i: &'ast syn::ItemTrait) {
+        if self.dead_trait_identifiers.contains(&i.ident) {
             self.output_dead_spans.push(i.span());
         }
     }
@@ -159,7 +179,7 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
     }
 }
 
-pub fn remove_dead_code(src: String) -> anyhow::Result<String> {
+pub fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
     let dead_code_diagnostics: Vec<Diagnostic> = rustc_diagnostics(&src)?
         .into_iter()
         .filter(|d| d.code.as_ref().map_or(false, |c| c.code == "dead_code"))
@@ -177,6 +197,7 @@ pub fn remove_dead_code(src: String) -> anyhow::Result<String> {
     let mut visitor = DeadCodeVisitor::new(
         visitor.output_dead_struct_identifiers,
         visitor.output_dead_fn_identifiers,
+        visitor.output_dead_trait_identifiers,
     );
     visitor.visit_file(&ast);
 
@@ -196,4 +217,15 @@ pub fn remove_dead_code(src: String) -> anyhow::Result<String> {
     let src: String = String::from_utf8(src)?;
 
     Ok(src)
+}
+
+pub fn remove_dead_code(mut src: String) -> anyhow::Result<String> {
+    loop {
+        let new_src = remove_dead_code_inner(src.clone())?;
+        if src == new_src {
+            return Ok(src);
+        } else {
+            src = new_src;
+        }
+    }
 }
