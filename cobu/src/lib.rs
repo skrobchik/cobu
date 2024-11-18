@@ -119,6 +119,7 @@ pub fn cli(args: Args) -> anyhow::Result<()> {
         let src = expand_libs(&libs, src)?;
         let src = remove_dead_code(src)?;
         let src = rustfmt(&src)?;
+        let src = format!("// Bundled by cobu (https://github.com/skrobchik/cobu)\n{src}");
         let mut f = std::fs::File::create(args.out_dir.join(bin.name).with_extension("rs"))?;
         f.write_all(src.as_bytes())?;
     }
