@@ -176,7 +176,7 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
     }
 }
 
-pub fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
+fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
     let dead_code_diagnostics: Vec<Diagnostic> = rustc_diagnostics(&src)?
         .into_iter()
         .filter(|d| d.code.as_ref().map_or(false, |c| c.code == "dead_code"))

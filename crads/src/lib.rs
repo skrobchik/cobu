@@ -78,6 +78,7 @@ impl Scanner {
     }
 }
 
+#[allow(dead_code)]
 pub trait One {
     fn one() -> Self;
 }
@@ -103,6 +104,7 @@ one_impl!(u32);
 one_impl!(u64);
 one_impl!(u128);
 
+#[allow(dead_code)]
 pub trait Zero {
     fn zero() -> Self;
 }

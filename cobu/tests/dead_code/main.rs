@@ -1,5 +1,5 @@
-const NUM_TESTS: u32 = 3;
-seq!(N in 1..=3 {
+const NUM_TESTS: u32 = 4;
+seq!(N in 1..=4 {
     #[allow(dead_code)]
     mod input_~N;
     mod golden_~N;
