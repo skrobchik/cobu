@@ -1,3 +1,3 @@
 fn main() -> anyhow::Result<()> {
-    cobu::cli(None)
+    cobu::parse_cli(None)
 }

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cobu", "crads"]
+members = ["cobu", "crads", "contests/*"]
 
 [workspace.package]
 license = "MIT"
