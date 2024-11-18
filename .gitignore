@@ -2,3 +2,4 @@
 *.pdb
 contests/*
 !contests/.gitkeep
+Cargo.lock

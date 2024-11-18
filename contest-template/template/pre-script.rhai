@@ -24,3 +24,4 @@ for x in "abcdefghijklmnopqrstuvwxyz" {
     file::write("src/bin/" + x + ".rs", bin_template);
     if x == last_letter { break; }
 }
+file::delete("src/bin/.gitkeep")
