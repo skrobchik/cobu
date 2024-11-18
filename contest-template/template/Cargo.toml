@@ -6,3 +6,6 @@ edition = "2021"
 
 [dependencies]
 crads = { path = "../../crads" }
+
+[build-dependencies]
+cobu = { path = "../../cobu" }
