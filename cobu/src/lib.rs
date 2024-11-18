@@ -91,7 +91,7 @@ pub fn cli(args: Args) -> anyhow::Result<()> {
             .find(|p| p.name == *package)
             .context(format!("Package {package} not found"))?
     } else {
-        &metadata.root_package().context("Root package not found")?
+        metadata.root_package().context("Root package not found")?
     };
 
     let bins: Vec<Target> = package

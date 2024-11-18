@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir(&dist_dir)?;
     }
 
-    let _ = cobu::cli(cobu::Args {
+    cobu::cli(cobu::Args {
         libs: vec![(
             "crads".to_string(),
             manifest_dir

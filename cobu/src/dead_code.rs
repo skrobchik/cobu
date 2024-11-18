@@ -161,20 +161,17 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
     }
 
     fn visit_item_impl(&mut self, i: &'ast syn::ItemImpl) {
-        match i.self_ty.as_ref() {
-            syn::Type::Path(type_path) => {
-                if type_path.path.segments.len() != 1 {
-                    unimplemented!()
-                }
-                if self
-                    .dead_struct_identifiers
-                    .contains(&type_path.path.segments.last().unwrap().ident)
-                {
-                    // TODO: Assuming that struct is in same module or that there's no name collisions
-                    self.output_dead_spans.push(i.span());
-                }
+        if let syn::Type::Path(type_path) = i.self_ty.as_ref() {
+            if type_path.path.segments.len() != 1 {
+                unimplemented!()
             }
-            _ => (),
+            if self
+                .dead_struct_identifiers
+                .contains(&type_path.path.segments.last().unwrap().ident)
+            {
+                // TODO: Assuming that struct is in same module or that there's no name collisions
+                self.output_dead_spans.push(i.span());
+            }
         }
     }
 }
