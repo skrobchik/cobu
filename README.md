@@ -34,6 +34,7 @@ only get compiled once for all contests.
 Go into the `contests` directory and create a new contest from the template.
 
 ```
+cd contests
 cargo generate ..
 ```
 
