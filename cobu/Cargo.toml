@@ -6,14 +6,14 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
-anyhow = "1.0"
-cargo-platform = "=0.1.8"
-cargo_metadata = "=0.19.0"
-clap = { version = "4.5", features = ["derive"] }
-proc-macro2 = { version = "1.0", features = ["span-locations"] }
-quote = "1.0"
-serde_json = "1.0"
-syn = { version = "2.0", features = ["full", "visit"] }
+anyhow = "1.0.98"
+cargo-platform = "0.2.0"
+cargo_metadata = "0.20.0"
+clap = { version = "4.5.40", features = ["derive"] }
+proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
+quote = "1.0.40"
+serde_json = "1.0.140"
+syn = { version = "2.0.104", features = ["full", "visit"] }
 
 [dev-dependencies]
-seq-macro = "0.3.5"
+seq-macro = "0.3.6"

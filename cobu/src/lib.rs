@@ -88,7 +88,7 @@ pub fn cli(args: Args) -> anyhow::Result<()> {
         metadata
             .packages
             .iter()
-            .find(|p| p.name == *package)
+            .find(|p| p.name.to_string() == *package)
             .context(format!("Package {package} not found"))?
     } else {
         metadata.root_package().context("Root package not found")?
