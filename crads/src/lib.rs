@@ -231,3 +231,32 @@ pub fn iter_all_vectors<T: PartialOrd + One + Add<Output = T> + Clone>(
     (min_len..=max_len)
         .flat_map(move |len| AllVectorsIterator::new(len, min_val.clone(), max_val.clone()))
 }
+
+
+pub fn sorted<I: IntoIterator<Item = T>, T: Ord>(iter: I) -> bool {
+    let mut iter = iter.into_iter();
+    if let Some(mut prev) = iter.next() {
+        while let Some(curr) = iter.next() {
+            if prev > curr {
+                return false;
+            }
+            prev = curr
+        }
+    }
+    true
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sorted() {
+        assert!(sorted([1, 1, 2, 2, 3, 4, 4]));
+        assert!(!sorted([0, 1, 1, 0, 1, 2, 3]));
+        assert!(sorted::<[i32; 0], i32>([]));
+        assert!(sorted([1]));
+        assert!(!sorted([2, 1]));
+    }
+}
