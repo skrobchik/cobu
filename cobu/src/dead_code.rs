@@ -173,7 +173,18 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
                 self.output_dead_spans.push(i.span());
             }
         }
+        if let Some(trait_) = i.trait_.as_ref() {
+            let type_path = &trait_.1;
+            if type_path.segments.len() != 1 {
+                unimplemented!()
+            }
+            if self.dead_trait_identifiers.contains(&type_path.segments.last().unwrap().ident) {
+                self.output_dead_spans.push(i.span());
+            }
+        }
     }
+
+    // TODO: Use items
 }
 
 fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {

@@ -232,7 +232,6 @@ pub fn iter_all_vectors<T: PartialOrd + One + Add<Output = T> + Clone>(
         .flat_map(move |len| AllVectorsIterator::new(len, min_val.clone(), max_val.clone()))
 }
 
-
 pub fn sorted<I: IntoIterator<Item = T>, T: Ord>(iter: I) -> bool {
     let mut iter = iter.into_iter();
     if let Some(mut prev) = iter.next() {
@@ -246,7 +245,6 @@ pub fn sorted<I: IntoIterator<Item = T>, T: Ord>(iter: I) -> bool {
     true
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +256,186 @@ mod tests {
         assert!(sorted::<[i32; 0], i32>([]));
         assert!(sorted([1]));
         assert!(!sorted([2, 1]));
+    }
+}
+
+pub use self::itertools::Itertools;
+
+mod itertools {
+    // Adapted from itertools (https://github.com/rust-itertools/itertools)
+
+    use self::adaptors::Product;
+    pub trait Itertools: Iterator {
+        /// Return an iterator adaptor that iterates over the cartesian product of
+        /// the element sets of two iterators `self` and `J`.
+        ///
+        /// Iterator element type is `(Self::Item, J::Item)`.
+        ///
+        /// ```
+        /// use itertools::Itertools;
+        ///
+        /// let it = (0..2).cartesian_product("αβ".chars());
+        /// itertools::assert_equal(it, vec![(0, 'α'), (0, 'β'), (1, 'α'), (1, 'β')]);
+        /// ```
+        fn cartesian_product<J>(self, other: J) -> Product<Self, J::IntoIter>
+        where
+            Self: Sized,
+            Self::Item: Clone,
+            J: IntoIterator,
+            J::IntoIter: Clone,
+        {
+            adaptors::cartesian_product(self, other.into_iter())
+        }
+    }
+
+    impl<T> Itertools for T where T: Iterator + ?Sized {}
+
+    mod adaptors {
+        use super::size_hint;
+
+        #[derive(Debug, Clone)]
+        /// An iterator adaptor that iterates over the cartesian product of
+        /// the element sets of two iterators `I` and `J`.
+        ///
+        /// Iterator element type is `(I::Item, J::Item)`.
+        ///
+        /// See [`.cartesian_product()`](crate::Itertools::cartesian_product) for more information.
+        #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
+        pub struct Product<I, J>
+        where
+            I: Iterator,
+        {
+            a: I,
+            /// `a_cur` is `None` while no item have been taken out of `a` (at definition).
+            /// Then `a_cur` will be `Some(Some(item))` until `a` is exhausted,
+            /// in which case `a_cur` will be `Some(None)`.
+            a_cur: Option<Option<I::Item>>,
+            b: J,
+            b_orig: J,
+        }
+
+        /// Create a new cartesian product iterator
+        ///
+        /// Iterator element type is `(I::Item, J::Item)`.
+        pub fn cartesian_product<I, J>(i: I, j: J) -> Product<I, J>
+        where
+            I: Iterator,
+            J: Clone + Iterator,
+            I::Item: Clone,
+        {
+            Product {
+                a_cur: None,
+                a: i,
+                b: j.clone(),
+                b_orig: j,
+            }
+        }
+
+        impl<I, J> Iterator for Product<I, J>
+        where
+            I: Iterator,
+            J: Clone + Iterator,
+            I::Item: Clone,
+        {
+            type Item = (I::Item, J::Item);
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let Self {
+                    a,
+                    a_cur,
+                    b,
+                    b_orig,
+                } = self;
+                let elt_b = match b.next() {
+                    None => {
+                        *b = b_orig.clone();
+                        match b.next() {
+                            None => return None,
+                            Some(x) => {
+                                *a_cur = Some(a.next());
+                                x
+                            }
+                        }
+                    }
+                    Some(x) => x,
+                };
+                a_cur
+                    .get_or_insert_with(|| a.next())
+                    .as_ref()
+                    .map(|a| (a.clone(), elt_b))
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                // Not ExactSizeIterator because size may be larger than usize
+                // Compute a * b_orig + b for both lower and upper bound
+                let mut sh = size_hint::mul(self.a.size_hint(), self.b_orig.size_hint());
+                if matches!(self.a_cur, Some(Some(_))) {
+                    sh = size_hint::add(sh, self.b.size_hint());
+                }
+                sh
+            }
+
+            fn fold<Acc, G>(self, mut accum: Acc, mut f: G) -> Acc
+            where
+                G: FnMut(Acc, Self::Item) -> Acc,
+            {
+                // use a split loop to handle the loose a_cur as well as avoiding to
+                // clone b_orig at the end.
+                let Self {
+                    mut a,
+                    a_cur,
+                    mut b,
+                    b_orig,
+                } = self;
+                if let Some(mut elt_a) = a_cur.unwrap_or_else(|| a.next()) {
+                    loop {
+                        accum = b.fold(accum, |acc, elt| f(acc, (elt_a.clone(), elt)));
+
+                        // we can only continue iterating a if we had a first element;
+                        if let Some(next_elt_a) = a.next() {
+                            b = b_orig.clone();
+                            elt_a = next_elt_a;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                accum
+            }
+        }
+    }
+
+    mod size_hint {
+        //! Arithmetic on `Iterator.size_hint()` values.
+        //!
+
+        use std::cmp;
+
+        /// `SizeHint` is the return type of `Iterator::size_hint()`.
+        pub type SizeHint = (usize, Option<usize>);
+
+        /// Add `SizeHint` correctly.
+        #[inline]
+        pub fn add(a: SizeHint, b: SizeHint) -> SizeHint {
+            let min = a.0.saturating_add(b.0);
+            let max = match (a.1, b.1) {
+                (Some(x), Some(y)) => x.checked_add(y),
+                _ => None,
+            };
+
+            (min, max)
+        }
+
+        /// Multiply `SizeHint` correctly
+        #[inline]
+        pub fn mul(a: SizeHint, b: SizeHint) -> SizeHint {
+            let low = a.0.saturating_mul(b.0);
+            let hi = match (a.1, b.1) {
+                (Some(x), Some(y)) => x.checked_mul(y),
+                (Some(0), None) | (None, Some(0)) => Some(0),
+                _ => None,
+            };
+            (low, hi)
+        }
     }
 }
