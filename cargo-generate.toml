@@ -1,2 +1,2 @@
 [template]
-sub_templates = ["contest-template"]
+sub_templates = ["templates/contest-template"]

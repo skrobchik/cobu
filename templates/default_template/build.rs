@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             manifest_dir
                 .join("..")
                 .join("..")
+                .join("crates")
                 .join("crads")
                 .join("src")
                 .join("lib.rs"),
