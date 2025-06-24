@@ -1,4 +1,3 @@
-const NUM_TESTS: u32 = 4;
 seq!(N in 1..=4 {
     #[allow(dead_code)]
     mod input_~N;
@@ -8,12 +7,13 @@ seq!(N in 1..=4 {
 use seq_macro::seq;
 use std::{io::Write, path::PathBuf};
 
-#[test]
-fn integration_tests() {
-    for i in 1..=NUM_TESTS {
-        integration_test(i);
+seq!(N in 1..=4 {
+    #[test]
+    fn integration_test_~N
+    () {
+        integration_test(N);
     }
-}
+});
 
 fn integration_test(test_index: u32) {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
