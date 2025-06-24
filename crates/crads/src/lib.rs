@@ -272,10 +272,10 @@ mod itertools {
         /// Iterator element type is `(Self::Item, J::Item)`.
         ///
         /// ```
-        /// use itertools::Itertools;
+        /// use crads::Itertools;
         ///
         /// let it = (0..2).cartesian_product("αβ".chars());
-        /// itertools::assert_equal(it, vec![(0, 'α'), (0, 'β'), (1, 'α'), (1, 'β')]);
+        /// assert_eq!(it.collect::<Vec<_>>(), vec![(0, 'α'), (0, 'β'), (1, 'α'), (1, 'β')]);
         /// ```
         fn cartesian_product<J>(self, other: J) -> Product<Self, J::IntoIter>
         where
@@ -408,8 +408,6 @@ mod itertools {
     mod size_hint {
         //! Arithmetic on `Iterator.size_hint()` values.
         //!
-
-        use std::cmp;
 
         /// `SizeHint` is the return type of `Iterator::size_hint()`.
         pub type SizeHint = (usize, Option<usize>);
