@@ -17,3 +17,4 @@ syn = { version = "2.0.104", features = ["full", "visit"] }
 
 [dev-dependencies]
 seq-macro = "0.3.6"
+cobu_macros = { path = "../cobu_macros" }

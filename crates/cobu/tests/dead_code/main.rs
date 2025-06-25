@@ -1,19 +1,11 @@
-seq!(N in 1..=4 {
-    #[allow(dead_code)]
-    mod input_~N;
-    mod golden_~N;
-});
-
-use seq_macro::seq;
 use std::{io::Write, path::PathBuf};
+use cobu_macros::integration_test;
 
-seq!(N in 1..=4 {
-    #[test]
-    fn integration_test_~N
-    () {
-        integration_test(N);
-    }
-});
+integration_test!(1);
+integration_test!(2);
+integration_test!(3);
+integration_test!(4);
+integration_test!(5);
 
 fn integration_test(test_index: u32) {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
