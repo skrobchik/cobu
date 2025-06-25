@@ -8,6 +8,8 @@ use clap::Parser;
 mod dead_code;
 pub use dead_code::remove_dead_code;
 
+use crate::dead_code::remove_tests;
+
 /// COmpetitive BUndler for Rust
 #[derive(Parser, Debug, Default)]
 #[command(version, about, long_about = None)]
@@ -74,6 +76,13 @@ fn expand_libs(libs: &BTreeMap<String, PathBuf>, src: String) -> Result<String, 
         .collect()
 }
 
+pub fn minimize_code(src: String) -> anyhow::Result<String> {
+    let src = remove_dead_code(src)?;
+    let src = remove_tests(src)?;
+    let src = rustfmt(&src)?;
+    Ok(src)
+}
+
 pub fn cli(args: Args) -> anyhow::Result<()> {
     let libs: BTreeMap<String, PathBuf> = args.libs.clone().into_iter().collect();
     assert_eq!(libs.len(), args.libs.len(), "no duplicate lib names");
@@ -117,8 +126,7 @@ pub fn cli(args: Args) -> anyhow::Result<()> {
     for bin in bins {
         let src = std::fs::read_to_string(bin.src_path)?;
         let src = expand_libs(&libs, src)?;
-        let src = remove_dead_code(src)?;
-        let src = rustfmt(&src)?;
+        let src = minimize_code(src)?;
         let src = format!("// Bundled by cobu (https://github.com/skrobchik/cobu)\n{src}");
         let mut f = std::fs::File::create(args.out_dir.join(bin.name).with_extension("rs"))?;
         f.write_all(src.as_bytes())?;

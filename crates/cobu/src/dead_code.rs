@@ -5,7 +5,7 @@ use anyhow::Context;
 use cargo_metadata::diagnostic::{Diagnostic, DiagnosticSpan};
 use proc_macro2::Span;
 use quote::quote;
-use syn::{spanned::Spanned, visit::Visit, Ident};
+use syn::{spanned::Spanned, token, visit::Visit, Ident};
 
 fn rustc_diagnostics(src: &str) -> anyhow::Result<Vec<Diagnostic>> {
     let mut command = std::process::Command::new("rustc")
@@ -178,13 +178,79 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
             if type_path.segments.len() != 1 {
                 unimplemented!()
             }
-            if self.dead_trait_identifiers.contains(&type_path.segments.last().unwrap().ident) {
+            if self
+                .dead_trait_identifiers
+                .contains(&type_path.segments.last().unwrap().ident)
+            {
                 self.output_dead_spans.push(i.span());
             }
         }
     }
 
     // TODO: Use items
+}
+
+fn is_test_module(item_mod: &syn::ItemMod) -> bool {
+    item_mod
+        .attrs
+        .iter()
+        .find(|attribute| {
+            matches!(attribute.style, syn::AttrStyle::Outer)
+                && match &attribute.meta {
+                    syn::Meta::List(meta_list) => {
+                        let mut tokens = meta_list.tokens.clone().into_iter();
+                        match tokens.next() {
+                            Some(proc_macro2::TokenTree::Ident(i)) => {
+                                &i.to_string() == "test" && tokens.next().is_none()
+                            }
+                            _ => false,
+                        }
+                    }
+                    _ => false,
+                }
+                && attribute.path().is_ident("cfg")
+        })
+        .is_some()
+}
+
+#[derive(Default)]
+struct TestModuleVisitor {
+    output_test_module_spans: Vec<Span>,
+}
+
+impl<'ast> Visit<'ast> for TestModuleVisitor {
+    fn visit_item_mod(&mut self, i: &'ast syn::ItemMod) {
+        if is_test_module(i) {
+            self.output_test_module_spans.push(i.span());
+        }
+    }
+}
+
+pub fn remove_tests(src: String) -> anyhow::Result<String> {
+    let ast = syn::parse_file(&src)?;
+    let mut test_module_visitor = TestModuleVisitor::default();
+    test_module_visitor.visit_file(&ast);
+    let src= remove_spans(src, test_module_visitor.output_test_module_spans)?;
+    Ok(src)
+}
+
+fn remove_spans(src: String, spans: Vec<Span>) -> anyhow::Result<String> {
+    let mut dead_bytes = vec![false; src.len()];
+    for span in spans {
+        for i in span.byte_range() {
+            dead_bytes[i] = true;
+        }
+    }
+
+    let src: Vec<u8> = src
+        .bytes()
+        .enumerate()
+        .filter(|(i, _b)| !dead_bytes[*i])
+        .map(|(_i, b)| b)
+        .collect();
+    let src: String = String::from_utf8(src)?;
+
+    Ok(src)
 }
 
 fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
@@ -209,20 +275,7 @@ fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
     );
     visitor.visit_file(&ast);
 
-    let mut dead_bytes = vec![false; src.len()];
-    for span in visitor.output_dead_spans {
-        for i in span.byte_range() {
-            dead_bytes[i] = true;
-        }
-    }
-
-    let src: Vec<u8> = src
-        .bytes()
-        .enumerate()
-        .filter(|(i, _b)| !dead_bytes[*i])
-        .map(|(_i, b)| b)
-        .collect();
-    let src: String = String::from_utf8(src)?;
+    let src= remove_spans(src, visitor.output_dead_spans)?;
 
     Ok(src)
 }
