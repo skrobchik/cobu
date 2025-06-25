@@ -223,6 +223,7 @@ impl<'ast> Visit<'ast> for TestModuleVisitor {
         if is_test_module(i) {
             self.output_test_module_spans.push(i.span());
         }
+        syn::visit::visit_item_mod(self, i);
     }
 }
 
