@@ -21,7 +21,7 @@ pub fn integration_test(tokens: TokenStream) -> TokenStream {
         Span::call_site(),
     );
     let tokens = quote! {
-        #[allow(dead_code)]
+        #[allow(dead_code, unused_imports)]
         mod #input_mod_name;
         mod #golden_mod_name;
         #[test]

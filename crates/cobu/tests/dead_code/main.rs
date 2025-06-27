@@ -7,6 +7,7 @@ integration_test!(3);
 integration_test!(4);
 integration_test!(5);
 integration_test!(6);
+integration_test!(7);
 
 fn integration_test(test_index: u32) {
     // let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());

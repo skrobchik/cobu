@@ -56,6 +56,7 @@ struct DeadIdentifierVisitor {
     output_dead_struct_identifiers: Vec<Ident>,
     output_dead_fn_identifiers: Vec<Ident>,
     output_dead_trait_identifiers: Vec<Ident>,
+    output_dead_use_identifiers: Vec<Ident>,
 }
 
 impl DeadIdentifierVisitor {
@@ -65,14 +66,17 @@ impl DeadIdentifierVisitor {
             output_dead_struct_identifiers: Vec::new(),
             output_dead_fn_identifiers: Vec::new(),
             output_dead_trait_identifiers: Vec::new(),
+            output_dead_use_identifiers: Vec::new(),
         }
     }
 
-    fn is_dead_code(&self, ident: &Ident) -> bool {
+    fn is_dead_code(&self, ident: Option<&Ident>, span: &Span) -> bool {
         self.dead_code_diagnostic_spans
             .iter()
             .any(|diagnostic_span| {
-                let span = ident.span();
+                if let Some(ident) = ident {
+                    assert_eq!(ident.span().byte_range(), span.byte_range());
+                }
                 let span_range: Range<usize> = span.byte_range();
                 let span_range = (span_range.start, span_range.end);
                 let diagnostic_span_range = (
@@ -80,17 +84,19 @@ impl DeadIdentifierVisitor {
                     usize::try_from(diagnostic_span.byte_end).unwrap(),
                 );
                 if span_range == diagnostic_span_range {
-                    let diagnostic_text = &diagnostic_span.text[0];
-                    assert_eq!(
-                        diagnostic_text
-                            .text
-                            .get(
-                                diagnostic_text.highlight_start - 1
-                                    ..diagnostic_text.highlight_end - 1
-                            )
-                            .unwrap(),
-                        &quote!(#ident).to_string()
-                    );
+                    if let Some(ident) = ident {
+                        let diagnostic_text = &diagnostic_span.text[0];
+                        assert_eq!(
+                            diagnostic_text
+                                .text
+                                .get(
+                                    diagnostic_text.highlight_start - 1
+                                        ..diagnostic_text.highlight_end - 1
+                                )
+                                .unwrap(),
+                            &quote!(#ident).to_string()
+                        );
+                    }
                     true
                 } else {
                     false
@@ -101,20 +107,26 @@ impl DeadIdentifierVisitor {
 
 impl<'ast> Visit<'ast> for DeadIdentifierVisitor {
     fn visit_item_struct(&mut self, i: &'ast syn::ItemStruct) {
-        if self.is_dead_code(&i.ident) {
+        if self.is_dead_code(Some(&i.ident), &i.ident.span()) {
             self.output_dead_struct_identifiers.push(i.ident.clone());
         }
     }
 
     fn visit_item_fn(&mut self, i: &'ast syn::ItemFn) {
-        if self.is_dead_code(&i.sig.ident) {
+        if self.is_dead_code(Some(&i.sig.ident), &i.sig.ident.span()) {
             self.output_dead_fn_identifiers.push(i.sig.ident.clone());
         }
     }
 
     fn visit_item_trait(&mut self, i: &'ast syn::ItemTrait) {
-        if self.is_dead_code(&i.ident) {
+        if self.is_dead_code(Some(&i.ident), &i.ident.span()) {
             self.output_dead_trait_identifiers.push(i.ident.clone());
+        }
+    }
+
+    fn visit_use_path(&mut self, i: &'ast syn::UsePath) {
+        if self.is_dead_code(None, &i.span()) {
+            self.output_dead_use_identifiers.push(i.ident.clone());
         }
     }
 }
@@ -123,6 +135,7 @@ struct DeadCodeVisitor {
     dead_struct_identifiers: Vec<Ident>,
     dead_fn_identifiers: Vec<Ident>,
     dead_trait_identifiers: Vec<Ident>,
+    dead_use_identifiers: Vec<Ident>,
     output_dead_spans: Vec<Span>,
 }
 
@@ -131,11 +144,13 @@ impl DeadCodeVisitor {
         dead_struct_identifiers: Vec<Ident>,
         dead_fn_identifiers: Vec<Ident>,
         dead_trait_identifiers: Vec<Ident>,
+        dead_use_identifiers: Vec<Ident>,
     ) -> Self {
         Self {
             dead_struct_identifiers,
             dead_fn_identifiers,
             dead_trait_identifiers,
+            dead_use_identifiers,
             output_dead_spans: Vec::new(),
         }
     }
@@ -187,7 +202,17 @@ impl<'ast> Visit<'ast> for DeadCodeVisitor {
         }
     }
 
-    // TODO: Use items
+    fn visit_item_use(&mut self, i: &'ast syn::ItemUse) {
+        match &i.tree {
+            syn::UseTree::Path(use_path) => if self.dead_use_identifiers.contains(&use_path.ident) {
+                self.output_dead_spans.push(i.span());
+            } ,
+            syn::UseTree::Name(_use_name) => todo!(),
+            syn::UseTree::Rename(_use_rename) => todo!(),
+            syn::UseTree::Glob(_use_glob) => todo!(),
+            syn::UseTree::Group(_use_group) => todo!(),
+        }
+    }
 }
 
 fn is_test_module(item_mod: &syn::ItemMod) -> bool {
@@ -257,7 +282,7 @@ fn remove_spans(src: String, spans: Vec<Span>) -> anyhow::Result<String> {
 fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
     let dead_code_diagnostics: Vec<Diagnostic> = rustc_diagnostics(&src)?
         .into_iter()
-        .filter(|d| d.code.as_ref().map_or(false, |c| c.code == "dead_code"))
+        .filter(|d| d.code.as_ref().map_or(false, |c| c.code == "dead_code" || c.code == "unused_imports"))
         .collect();
 
     let dead_code_diagnostic_spans: Vec<DiagnosticSpan> = dead_code_diagnostics
@@ -273,10 +298,13 @@ fn remove_dead_code_inner(src: String) -> anyhow::Result<String> {
         visitor.output_dead_struct_identifiers,
         visitor.output_dead_fn_identifiers,
         visitor.output_dead_trait_identifiers,
+        visitor.output_dead_use_identifiers,
     );
     visitor.visit_file(&ast);
 
     let src= remove_spans(src, visitor.output_dead_spans)?;
+
+    // TODO: Remove empty modules
 
     Ok(src)
 }
