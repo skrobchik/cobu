@@ -6,7 +6,7 @@ fn main() {
 use mylib::add;
 
 mod mylib {
-    pub fn add(a: i32, b: i32) -> i32 {
+    pub(crate) fn add(a: i32, b: i32) -> i32 {
         a + b
     }
 }

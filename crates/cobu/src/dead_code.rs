@@ -1,4 +1,4 @@
-use std::{io::Write, ops::Range};
+use std::{collections::BTreeSet, io::Write, ops::Range};
 
 use anyhow::Context;
 
@@ -318,4 +318,41 @@ pub fn remove_dead_code(mut src: String) -> anyhow::Result<String> {
             src = new_src;
         }
     }
+}
+
+
+#[derive(Default)]
+/// 🍻
+struct PubVisitor {
+    output_pub_token_spans: Vec<Span>
+}
+
+impl<'ast> Visit<'ast> for PubVisitor {
+    fn visit_visibility(&mut self, i: &'ast syn::Visibility) {
+        match i {
+            syn::Visibility::Public(token) => self.output_pub_token_spans.push(token.span()),
+            _ => (),
+        }
+    }
+}
+
+pub fn replace_pub_with_pub_crate(src: String) -> anyhow::Result<String> {
+    let ast = syn::parse_file(&src)?;
+    let mut pub_visitor = PubVisitor::default();
+    pub_visitor.visit_file(&ast);
+    let output_pub_token_spans = pub_visitor.output_pub_token_spans;
+    let span_start_bytes: BTreeSet<usize> = output_pub_token_spans.iter().map(|span| span.byte_range().start).collect();
+    let span_bytes: BTreeSet<usize> = output_pub_token_spans.iter().map(|span| span.byte_range().into_iter()).flatten().collect();
+    let mut new_src: Vec<u8> = Vec::new();
+    for (i, b) in src.bytes().enumerate() {
+        if span_start_bytes.contains(&i) {
+            new_src.extend("pub(crate)".bytes());
+        } else if span_bytes.contains(&i) {
+            ()
+        } else {
+            new_src.push(b);
+        }
+    }
+    let new_src = String::try_from(new_src)?;
+    Ok(new_src)
 }

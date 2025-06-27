@@ -1,5 +1,5 @@
 mod foo {
-    pub fn foo_used() {}
+    pub(crate) fn foo_used() {}
 }
 
 #[allow(dead_code)]

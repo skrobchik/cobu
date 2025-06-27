@@ -8,7 +8,7 @@ use clap::Parser;
 mod dead_code;
 pub use dead_code::remove_dead_code;
 
-use crate::dead_code::remove_tests;
+use crate::dead_code::{remove_tests, replace_pub_with_pub_crate};
 
 /// COmpetitive BUndler for Rust
 #[derive(Parser, Debug, Default)]
@@ -77,6 +77,7 @@ fn expand_libs(libs: &BTreeMap<String, PathBuf>, src: String) -> Result<String, 
 }
 
 pub fn minimize_code(src: String) -> anyhow::Result<String> {
+    let src= replace_pub_with_pub_crate(src)?;
     let src = remove_dead_code(src)?;
     let src = remove_tests(src)?;
     let src = rustfmt(&src)?;

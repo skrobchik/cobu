@@ -4,10 +4,10 @@ fn main() {
 }
 
 mod mylib {
-    pub(crate) use self::nested_lib::MyTrait;
+    pub use self::nested_lib::MyTrait;
 
     mod nested_lib {
-        pub(crate) trait MyTrait {
+        pub trait MyTrait {
             fn duplicate(self) -> Self;
         }
 
