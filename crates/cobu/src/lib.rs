@@ -68,16 +68,15 @@ pub fn rustfmt(src: &str) -> anyhow::Result<String> {
 }
 
 fn expand_libs(libs: &BTreeMap<String, PathBuf>, src: String) -> Result<String, std::io::Error> {
-    libs.iter()
-        .map(|(name, path)| {
+    std::iter::once(Ok(src))
+        .chain(libs.iter().map(|(name, path)| {
             std::fs::read_to_string(path).map(|contents| format!("mod {name} {{\n{}\n}}", contents))
-        })
-        .chain(std::iter::once(Ok(src)))
+        }))
         .collect()
 }
 
 pub fn minimize_code(src: String) -> anyhow::Result<String> {
-    let src= replace_pub_with_pub_crate(src)?;
+    let src = replace_pub_with_pub_crate(src)?;
     let src = remove_dead_code(src)?;
     let src = remove_tests(src)?;
     let src = rustfmt(&src)?;
