@@ -77,8 +77,8 @@ fn expand_libs(libs: &BTreeMap<String, PathBuf>, src: String) -> Result<String, 
 
 pub fn minimize_code(src: String) -> anyhow::Result<String> {
     let src = replace_pub_with_pub_crate(src)?;
-    let src = remove_dead_code(src)?;
     let src = remove_tests(src)?;
+    let src = remove_dead_code(src)?;
     let src = rustfmt(&src)?;
     Ok(src)
 }

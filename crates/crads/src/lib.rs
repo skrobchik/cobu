@@ -1,7 +1,114 @@
 use std::{
     io::stdin,
-    ops::{Add, BitXor, Mul, Range, Rem, Sub},
+    ops::{Add, BitXor, Index, IndexMut, Mul, Range, Rem, Sub},
 };
+
+pub struct Grid<T: Default + Clone> {
+    inner: Vec<T>,
+    cols: usize,
+}
+
+
+impl<T: Default + Clone> Grid<T> {
+    pub fn new(rows: usize, cols: usize) -> Grid<T> {
+        let inner = vec![Default::default(); rows * cols];
+        Grid {
+            inner,
+            cols
+        }
+    }
+
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    pub fn rows(&self) -> usize {
+        self.inner.len() / self.cols
+    }
+
+    fn inner_index(&self, index: (usize, usize)) -> usize {
+        index.0 * self.cols + index.1
+    }
+}
+
+#[derive(Debug)]
+pub struct NotAGridError;
+
+impl<T: Default + Clone> TryFrom<Vec<Vec<T>>> for Grid<T> {
+    type Error = NotAGridError;
+
+    fn try_from(value: Vec<Vec<T>>) -> Result<Self, Self::Error> {
+        let rows = value.len();
+        if rows == 0 {
+            return Ok(Grid::new(0, 0));
+        }
+        let cols = value[0].len();
+        for row in &value[1..] {
+            if row.len() != cols {
+                return Err(NotAGridError);
+            }
+        }
+        Ok(Grid {
+            inner: value.into_iter().flatten().collect(),
+            cols,
+        })
+    }
+}
+
+
+impl<T: Default + Clone> Index<(usize, usize)> for Grid<T> {
+    type Output = T;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        self.inner.index(self.inner_index(index))
+    }
+}
+
+impl<T: Default + Clone> IndexMut<(usize, usize)> for Grid<T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        self.inner.index_mut(self.inner_index(index))
+    }
+}
+
+pub struct GridSum<T: Add<Output = T> + Default + Copy + Sub<Output = T>> {
+    grid: Grid<T>,
+}
+
+impl<T: Add<Output = T> + Default + Copy + Sub<Output = T>> GridSum<T> {
+    pub fn sum(&self, topleft: (usize, usize), bottomright: (usize, usize)) -> T {
+        assert!(bottomright.0 >= topleft.0);
+        assert!(bottomright.1 >= topleft.1);
+        let mut result = self.grid[bottomright];
+        if topleft.0 > 0 && topleft.1 > 0 {
+            result = result + self.grid[(topleft.0-1, topleft.1-1)];
+        }
+        if topleft.1 > 0 {
+            result = result - self.grid[(bottomright.0, topleft.1-1)];
+        }
+        if topleft.0 > 0 {
+            result = result - self.grid[(topleft.0-1, bottomright.1)];
+        }
+        result
+    }
+}
+
+impl<T: Add<Output = T> + Default + Copy + Sub<Output = T>> From<Grid<T>> for GridSum<T> {
+    fn from(mut grid: Grid<T>) -> Self {
+        for (i, j) in (0..grid.rows()).cartesian_product(0..grid.cols()) {
+            if i > 0 {
+                grid[(i,j)] = grid[(i,j)] + grid[(i-1,j)];
+            }
+            if j > 0 {
+                grid[(i,j)] = grid[(i,j)] + grid[(i,j-1)];
+            }
+            if i > 0 && j > 0 {
+                grid[(i,j)] = grid[(i,j)] - grid[(i-1,j-1)];
+            }
+        }
+        GridSum { grid }
+    }
+}
+
 
 pub struct PrefixSum<T: Add<Output = T> + Default + Copy + Sub<Output = T>> {
     sums: Vec<T>,

@@ -10,6 +10,7 @@ use syn::{spanned::Spanned, token, visit::Visit, Ident};
 fn rustc_diagnostics(src: &str) -> anyhow::Result<Vec<Diagnostic>> {
     let mut command = std::process::Command::new("rustc")
         .args([
+            "--edition", "2024",
             "--error-format=json",
             "-C",
             "debuginfo=none",
