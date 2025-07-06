@@ -3,6 +3,42 @@ use std::{
     ops::{Add, BitXor, Index, IndexMut, Mul, Range, Rem, Sub},
 };
 
+
+pub fn primes(n: u32) -> Vec<u32> {
+    let mut is_prime = vec![true; usize::try_from(n).unwrap()+1];
+    is_prime[0] = false;
+    is_prime[1] = false;
+    for x in 2..=n {
+        if !is_prime[usize::try_from(x).unwrap()] {
+            continue;
+        }
+    let mut y = x;
+        while let Some(new_y) = y.checked_add(x) {
+            if new_y > n {
+                break;
+            }
+            y = new_y;
+            is_prime[usize::try_from(y).unwrap()] = false;
+        }
+    }
+    let primes = (0..=n).filter(|x| is_prime[usize::try_from(*x).unwrap()]).collect();
+    primes
+}
+
+
+pub fn prime_factors(mut n: u32, primes: &[u32]) -> Vec<u32> {
+    assert!(primes.last().unwrap().saturating_mul(*primes.last().unwrap()) >= n, "{} > {:#?}^2 = {:#?}", n, primes.last(), primes.last().map(|x| x.saturating_mul(*x)));
+    let mut factors = Vec::new();
+    for p in primes {
+        while n % p == 0 {
+            factors.push(*p);
+            n /= p;
+        }
+    }
+    factors
+}
+
+
 pub struct Grid<T: Default + Clone> {
     inner: Vec<T>,
     cols: usize,
