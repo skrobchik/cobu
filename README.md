@@ -1,3 +1,7 @@
+This seems like a much more mature project and supports dependencies from crates.io
+
+https://github.com/qryxip/cargo-equip
+
 # COBU: Competitive Bundler
 
 Workspace for COBU and other projects for competitive programming in Rust.
